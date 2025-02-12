@@ -35,6 +35,7 @@ def pushData(co_data):
             response.close;
     except:
         print("Exception")
+        
 def checkData(co_data):
     if(co_data < 100):
         return "No danger !"
