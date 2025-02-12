@@ -20,8 +20,10 @@ bin/pip install -r requirements.txt
 ```bash
 bin/python3 nogas.py
 ```
-### Example env file 
+### Example env file
 user must be admin 
+```bash
 CRED={"email":"nogas@gmail.com","password":"gas-123"}
 LOGIN_URL="http://10.10.23.172:3001/user/login"
 ADD_DATA_URL="http://10.10.23.172:3001/addData"
+```

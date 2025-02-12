@@ -35,7 +35,7 @@ def pushData(co_data):
             response.close;
     except:
         print("Exception")
-        
+
 def checkData(co_data):
     if(co_data < 100):
         return "No danger !"
@@ -50,6 +50,7 @@ def checkData(co_data):
     elif(co_data > 3200):
         return "Imminent death !"
 def alarm():
+    signal = pi.read(21)
     print("BIB")
     
 def main():
@@ -60,7 +61,6 @@ def main():
             ppm = detection.percentage()
             print('CO: {} ppm'.format(round(ppm[detection.CO_GAS],4)))
             message = checkData(ppm[detection.CO_GAS]);
-            signal = pi.read(21)
             if(message =="Be careful, Danger !"):
                 alarm()
             # time.sleep(0.5)
