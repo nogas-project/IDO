@@ -1,55 +1,81 @@
-"""
-This Raspberry Pi code was developed by newbiely.com
-This Raspberry Pi code is made available for public use without any restriction
-For comprehensive instructions and wiring diagrams, please visit:
-https://newbiely.com/tutorials/raspberry-pi/raspberry-pi-gas-sensor
-"""
-
-
 import time
-import board
-import busio
-import adafruit_ads1x15.ads1115 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
-import RPi.GPIO as GPIO
-import time
+from gas_detection import GasDetection
+import requests
+import pigpio
+import os
+from dotenv import load_dotenv, dotenv_values 
+load_dotenv()
 
-# Set up the GPIO mode
-GPIO.setmode(GPIO.BCM)
-
-# Set up the GPIO pin for reading the DO output
-DO_PIN = 15  # Replace with the actual GPIO pin number
-GPIO.setup(DO_PIN, GPIO.IN)
-
-# I2C Interface
-i2c = busio.I2C(board.SCL, board.SDA)
-
-# Create the ADS object and specify the gain
-ads = ADS.ADS1115(i2c)
-ads.gain = 4
-chan = AnalogIn(ads, ADS.P0)
-
-try:
-    while True:
-        # Read the state of the DO pin
-        gas_present = GPIO.input(DO_PIN)
-
-        # Determine if gas is present or not
-        if gas_present == GPIO.LOW:
-            gas_state = "Gas Present"
+btn = pigpio.pi()
+btn.set_mode(21,pigpio.INPUT)
+buz = pigpio.pi()
+buz.set_mode(20,pigpio.OUTPUT)
+def getToken(): 
+    try:
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+        HOST=os.getenv("LOGIN_URL")
+        CRED=os.getenv("CRED")
+        login = requests.post(HOST, headers=headers, data=CRED) 
+        login.close
+        return login.text
+    except:
+        return None
+    
+def pushData(co_data):
+    try:
+        data={"co2_amount":co_data}
+        token = getToken()
+        token = token.lstrip(token[0]).rstrip(token[-1])
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json" }
+        HOST=os.getenv("ADD_DATA_URL")
+        response = requests.post(HOST, headers=headers, json=data)
+        if response.status_code == 200:
+            data = response.text
+            print(data)
+            response.close
         else:
-            gas_state = "No Gas"
-            print(f"Voltage: {chan.voltage}V")
-            time.sleep(1)
+            print(f"Request failed with status code {response.status_code}: {response.text}")
+            response.close;
+    except:
+        print("Exception")
 
-        # Print the gas state
-        print(f"Gas State: {gas_state}")
+def checkData(co_data):
+    if(co_data < 100):
+        return "No danger !"
+    if(co_data < 200): 
+        return "it's alright !" 
+    elif(co_data < 400): 
+        return "Be careful, Danger !"
+    elif(co_data < 800):
+        return "Evacuate imediately !"
+    elif(co_data < 1600):
+        return "Death in couple hours !"
+    elif(co_data > 3200):
+        return "Imminent death !"
+def alarm():
+    while True: 
+        signal = btn.read(21)
+        if(signal == 0):
+            buz.write(20, 0)
+            break
+        else:
+            buz.write(20,1)
+def main():
+    print('Calibrating ...')
+    detection = GasDetection()
+    try:
+        while True:
+            ppm = detection.percentage()
+            print('CO: {} ppm'.format(round(ppm[detection.CO_GAS],4)))
+            co_data = ppm[detection.CO_GAS]
+            message = checkData(co_data)
+            pushData(co_data)
+            if(co_data >= 0.1):
+                alarm()
+                print(message)
+            time.sleep(30)
+    except KeyboardInterrupt:
+        print('\nAborted by user!')
 
-        time.sleep(0.5)  # Wait for a short period before reading again
-
-except KeyboardInterrupt:
-    print("Gas detection stopped by user")
-
-finally:
-    # Clean up GPIO settings
-    GPIO.cleanup()
+if __name__ == '__main__':
+    main()
